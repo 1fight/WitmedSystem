@@ -1,0 +1,50 @@
+#include "mainform.h"
+#include "ui_mainform.h"
+#include "register.h"
+#include <QMessageBox>
+#include "database.h"
+
+MainForm::MainForm(QWidget *parent)
+    : QMainWindow(parent), ui(new Ui::MainForm), regWindow(new Register)
+{
+    ui->setupUi(this);
+    connect(ui->pushButton_login, &QPushButton::clicked, this, &MainForm::onLoginClicked);
+    connect(ui->pushButton_reg, &QPushButton::clicked, this, &MainForm::onRegClicked);
+}
+
+MainForm::~MainForm()
+{
+    delete ui;
+}
+
+
+
+void MainForm::onLoginClicked()
+{
+    QString user = ui->lineEdit_user->text().trimmed();
+    QString pwd  = ui->lineEdit_pwd->text().trimmed();
+
+    if (user.isEmpty() || pwd.isEmpty()) {
+        QMessageBox::warning(this, "提示", "用户名或密码不能为空！");
+        return;
+    }
+
+    Database db;
+    QVariantMap u;
+    if (!db.findUserByUsername(user, u)) {
+        QMessageBox::warning(this, "登录失败", "用户名不存在！");
+        return;
+    }
+    if (!db.verifyUserPassword(user, pwd)) {
+        QMessageBox::warning(this, "登录失败", "密码错误！");
+        return;
+    }
+
+    QString role = u["role"].toString();
+    QMessageBox::information(this, "登录成功",
+                             QString("欢迎 %1（%2）").arg(user, role));
+}
+void MainForm::onRegClicked()
+{
+    regWindow->show();
+}
