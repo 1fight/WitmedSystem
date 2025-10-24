@@ -94,7 +94,11 @@
        </widget>
       </item>
       <item>
-       <widget class="QLineEdit" name="lineEdit_3"/>
+       <widget class="QLineEdit" name="lineEdit_3">
+        <property name="inputMask">
+         <string>000</string>
+        </property>
+       </widget>
       </item>
      </layout>
     </item>
@@ -122,7 +126,14 @@
        </widget>
       </item>
       <item>
-       <widget class="QLineEdit" name="lineEdit_7"/>
+       <widget class="QLineEdit" name="lineEdit_7">
+        <property name="inputMask">
+         <string>000000000000000000</string>
+        </property>
+        <property name="maxLength">
+         <number>18</number>
+        </property>
+       </widget>
       </item>
      </layout>
     </item>
@@ -136,7 +147,14 @@
        </widget>
       </item>
       <item>
-       <widget class="QLineEdit" name="lineEdit_5"/>
+       <widget class="QLineEdit" name="lineEdit_5">
+        <property name="inputMask">
+         <string>00000000000</string>
+        </property>
+        <property name="maxLength">
+         <number>11</number>
+        </property>
+       </widget>
       </item>
      </layout>
     </item>

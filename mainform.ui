@@ -13,6 +13,12 @@
   <property name="windowTitle">
    <string>MainForm</string>
   </property>
+  <property name="styleSheet">
+   <string notr="true">QMainWindow {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                                stop:0 #eef2f3, stop:1 #8e9eab);
+}</string>
+  </property>
   <widget class="QWidget" name="centralWidget">
    <widget class="QPushButton" name="exit">
     <property name="geometry">
