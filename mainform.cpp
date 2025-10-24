@@ -3,6 +3,8 @@
 #include "register.h"
 #include <QMessageBox>
 #include "database.h"
+#include <QPixmap>
+#include <QPainter>
 
 MainForm::MainForm(QWidget *parent)
     : QMainWindow(parent), ui(new Ui::MainForm), regWindow(new Register)
@@ -16,8 +18,6 @@ MainForm::~MainForm()
 {
     delete ui;
 }
-
-
 
 void MainForm::onLoginClicked()
 {
@@ -39,12 +39,20 @@ void MainForm::onLoginClicked()
         QMessageBox::warning(this, "登录失败", "密码错误！");
         return;
     }
+    // 密码已验证通过
+    QString realRole = u["role"].toString();
+    if (realRole != ui->comboBox_role->currentText()) {
+        QMessageBox::warning(this, "登录失败", "身份选择错误！");
+        return;
+    }
 
     QString role = u["role"].toString();
     QMessageBox::information(this, "登录成功",
                              QString("欢迎 %1（%2）").arg(user, role));
+
 }
 void MainForm::onRegClicked()
 {
     regWindow->show();
 }
+
