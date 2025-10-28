@@ -7,6 +7,14 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 
+// 存储在线用户信息
+struct OnlineUser {
+    int id;
+    QString username;
+    QString role;
+    QTcpSocket* socket;
+};
+
 // 聊天服务器：管理客户端连接，转发医患消息（仅支持文字，不存储记录）
 class ChatServer : public QTcpServer
 {
@@ -26,11 +34,15 @@ private slots:
     void onReadyRead();
 
 private:
-    // 存储用户ID与对应的Socket（key: 用户ID，value: 连接的Socket）
-    QMap<int, QTcpSocket*> m_clientMap;
+    // 存储用户ID与对应的Socket和用户信息
+    QMap<int, OnlineUser> m_onlineUsers;
 
-    // 解析客户端消息（JSON格式：{senderId: x, targetId: y, content: "消息内容"}）
-    bool parseMessage(const QByteArray &data, int &senderId, int &targetId, QString &content);
+    // 解析客户端消息
+    bool parseMessage(const QByteArray &data, QJsonObject &obj);
+    // 广播在线用户列表
+    void broadcastOnlineUsers();
+    // 根据用户ID查找在线用户
+    OnlineUser* findUserById(int userId);
 };
 
 #endif // CHATSERVER_H
