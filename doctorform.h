@@ -51,8 +51,8 @@ private:
     // 初始化方法
     void initUI();                // 纯代码创建界面
     void initData();              // 加载初始数据
-    void loadPatients();          // 加载患者列表
-    void loadAppointments();      // 加载预约列表
+    void loadPatients();          // 加载医生接诊的患者
+    void loadAppointments();      // 加载医生的预约
 };
 
 #endif // DOCTORFORM_H
