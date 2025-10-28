@@ -16,6 +16,8 @@ class MainForm : public QMainWindow
 public:
     explicit MainForm(QWidget *parent = nullptr);
     ~MainForm();
+signals:
+    void sendCurrentLoginID(int c_ID);
 
 private slots:
     void onLoginClicked();
