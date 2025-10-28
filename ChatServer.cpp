@@ -39,18 +39,20 @@ void ChatServer::onDisconnected()
     QTcpSocket *clientSocket = qobject_cast<QTcpSocket*>(sender());
     if (!clientSocket) return;
 
-    // 从映射表中移除断开的客户端（通过Socket反向查找用户ID）
-    auto it = m_clientMap.begin();
-    while (it != m_clientMap.end()) {
-        if (it.value() == clientSocket) {
+    // 从在线用户列表中移除断开的客户端
+    auto it = m_onlineUsers.begin();
+    while (it != m_onlineUsers.end()) {
+        if (it.value().socket == clientSocket) {
             qDebug() << "用户ID：" << it.key() << "断开连接";
-            it = m_clientMap.erase(it); // 移除并迭代下一个
+            it = m_onlineUsers.erase(it);
+            // 广播在线用户列表更新
+            broadcastOnlineUsers();
         } else {
             ++it;
         }
     }
 
-    clientSocket->deleteLater(); // 释放资源
+    clientSocket->deleteLater();
 }
 
 // 接收消息并转发
@@ -61,59 +63,124 @@ void ChatServer::onReadyRead()
 
     // 读取客户端发送的所有数据
     QByteArray data = clientSocket->readAll();
-    int senderId = -1;    // 发送者ID（医生/患者的user_id）
-    int targetId = -1;    // 目标ID（对方的user_id）
-    QString content;      // 消息内容
-
-    // 解析消息格式（简易版用JSON，确保格式正确）
-    if (!parseMessage(data, senderId, targetId, content)) {
-        qDebug() << "消息格式错误，忽略：" << data;
-        clientSocket->write("消息格式错误，请使用标准格式");
-        return;
-    }
-
-    // 首次发送消息时，注册用户ID与Socket的映射（senderId未在映射表中时）
-    if (!m_clientMap.contains(senderId)) {
-        m_clientMap.insert(senderId, clientSocket);
-        qDebug() << "用户ID：" << senderId << "注册到聊天服务器";
-    }
-
-    // 检查目标用户是否在线（在映射表中）
-    if (m_clientMap.contains(targetId)) {
-        // 构造转发消息（保留发送者ID，方便接收方显示）
-        QJsonObject forwardMsg;
-        forwardMsg["senderId"] = senderId;
-        forwardMsg["content"] = content;
-        QByteArray forwardData = QJsonDocument(forwardMsg).toJson();
-
-        // 转发给目标用户
-        m_clientMap[targetId]->write(forwardData);
-        qDebug() << "转发消息：" << senderId << "→" << targetId << "，内容：" << content;
-    } else {
-        // 目标不在线，提示发送者
-        QJsonObject replyMsg;
-        replyMsg["error"] = "对方不在线，无法发送消息";
-        clientSocket->write(QJsonDocument(replyMsg).toJson());
-        qDebug() << "目标用户" << targetId << "不在线，发送失败";
+    QStringList msgs = QString(data).split('\n');
+    
+    foreach (const QString &msgStr, msgs) {
+        if (msgStr.isEmpty()) continue;
+        
+        QJsonObject msgObj;
+        if (!parseMessage(msgStr.toUtf8(), msgObj)) {
+            qDebug() << "消息格式错误，忽略：" << msgStr;
+            continue;
+        }
+        
+        QString type = msgObj["type"].toString();
+        
+        if (type == "online_status") {
+            // 处理在线状态更新
+            int userId = msgObj["user_id"].toInt();
+            QString status = msgObj["status"].toString();
+            
+            if (status == "online") {
+                // 用户上线
+                OnlineUser user;
+                user.id = userId;
+                user.username = msgObj["username"].toString();
+                user.role = msgObj["role"].toString();
+                user.socket = clientSocket;
+                m_onlineUsers[userId] = user;
+                qDebug() << "用户上线：" << userId << "(" << user.username << ")";
+            } else if (status == "offline") {
+                // 用户下线
+                m_onlineUsers.remove(userId);
+                qDebug() << "用户下线：" << userId;
+            }
+            
+            // 广播在线用户列表
+            broadcastOnlineUsers();
+        }
+        else if (type == "chat_request") {
+            // 转发聊天请求
+            int fromUserId = msgObj["from"].toInt();
+            int toUserId = msgObj["to"].toInt();
+            
+            OnlineUser* targetUser = findUserById(toUserId);
+            if (targetUser) {
+                targetUser->socket->write(msgStr.toUtf8() + "\n");
+                qDebug() << "转发聊天请求：" << fromUserId << "→" << toUserId;
+            }
+        }
+        else if (type == "chat_response") {
+            // 转发聊天响应
+            int toUserId = msgObj["to"].toInt();
+            OnlineUser* targetUser = findUserById(toUserId);
+            if (targetUser) {
+                targetUser->socket->write(msgStr.toUtf8() + "\n");
+                qDebug() << "转发聊天响应：" << msgObj["from"].toInt() << "→" << toUserId;
+            }
+        }
+        else if (type == "chat") {
+            // 处理普通聊天消息（现有功能）
+            int fromUserId = msgObj["from"].toInt();
+            int toUserId = msgObj["to"].toInt();
+            
+            OnlineUser* targetUser = findUserById(toUserId);
+            if (targetUser) {
+                targetUser->socket->write(msgStr.toUtf8() + "\n");
+                qDebug() << "转发聊天消息：" << fromUserId << "→" << toUserId;
+            } else {
+                // 目标用户不在线
+                QJsonObject reply {
+                    {"type", "error"},
+                    {"message", "对方不在线，无法发送消息"}
+                };
+                clientSocket->write(QJsonDocument(reply).toJson() + "\n");
+            }
+        }
     }
 }
 
-// 解析客户端消息（JSON格式校验）
-bool ChatServer::parseMessage(const QByteArray &data, int &senderId, int &targetId, QString &content)
+// 解析客户端消息
+bool ChatServer::parseMessage(const QByteArray &data, QJsonObject &obj)
 {
     QJsonDocument doc = QJsonDocument::fromJson(data);
     if (doc.isNull()) return false;
-
-    QJsonObject obj = doc.object();
-    // 必须包含senderId（整数）、targetId（整数）、content（字符串）
-    if (!obj.contains("senderId") || !obj["senderId"].isDouble()
-        || !obj.contains("targetId") || !obj["targetId"].isDouble()
-        || !obj.contains("content") || !obj["content"].isString()) {
-        return false;
-    }
-
-    senderId = obj["senderId"].toInt();
-    targetId = obj["targetId"].toInt();
-    content = obj["content"].toString();
+    
+    obj = doc.object();
     return true;
+}
+
+// 广播在线用户列表
+void ChatServer::broadcastOnlineUsers()
+{
+    QJsonArray usersArray;
+    foreach (const OnlineUser &user, m_onlineUsers.values()) {
+        QJsonObject userObj;
+        userObj["id"] = user.id;
+        userObj["username"] = user.username;
+        userObj["role"] = user.role;
+        usersArray.append(userObj);
+    }
+    
+    QJsonObject onlineUsersMsg;
+    onlineUsersMsg["type"] = "online_users";
+    onlineUsersMsg["users"] = usersArray;
+    
+    QByteArray data = QJsonDocument(onlineUsersMsg).toJson() + "\n";
+    
+    // 发送给所有在线用户
+    foreach (const OnlineUser &user, m_onlineUsers.values()) {
+        user.socket->write(data);
+    }
+    
+    qDebug() << "广播在线用户列表，当前在线人数：" << m_onlineUsers.size();
+}
+
+// 根据用户ID查找在线用户
+OnlineUser* ChatServer::findUserById(int userId)
+{
+    if (m_onlineUsers.contains(userId)) {
+        return &m_onlineUsers[userId];
+    }
+    return nullptr;
 }
