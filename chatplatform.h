@@ -19,7 +19,7 @@ class ChatPlatform : public QWidget
     Q_OBJECT
 
 public:
-    explicit ChatPlatform(MainForm *mainForm, QWidget *parent = nullptr);
+   explicit ChatPlatform(int currentUserId, const QString &currentRole, Database *db, QWidget *parent = nullptr);
     ~ChatPlatform();
 
 private slots:
