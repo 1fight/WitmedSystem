@@ -12,7 +12,7 @@ DoctorForm::DoctorForm(const QString &doctorUsername, Database *db, QWidget *par
       m_selectedPatientId(0),
       m_chatManager(new ChatManager(db, this))
 {
-    // 从数据库获取医生ID（使用原库findUserByUsername接口）
+    // 从数据库获取医生ID（使用仓库提供的findUserByUsername接口）
     QVariantMap doctorInfo;
     if (!m_db->findUserByUsername(m_doctorUsername, doctorInfo)) {
         QMessageBox::critical(this, "错误", "获取医生信息失败");
@@ -65,10 +65,10 @@ void DoctorForm::initUI()
     m_appointmentTable->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
 
     QHBoxLayout *centerLayout = new QHBoxLayout();
-    centerLayout->addWidget(new QLabel("患者列表", this));
+    centerLayout->addWidget(new QLabel("接诊患者列表", this));
     centerLayout->addWidget(m_patientTable, 1); // 占1份宽度
     centerLayout->addSpacing(20);
-    centerLayout->addWidget(new QLabel("预约列表", this));
+    centerLayout->addWidget(new QLabel("我的预约列表", this));
     centerLayout->addWidget(m_appointmentTable, 1); // 占1份宽度
 
     // 3. 底部操作按钮
@@ -115,12 +115,20 @@ void DoctorForm::initData()
     loadAppointments();
 }
 
-// 加载患者列表（从patients表查询）
+// 加载医生接诊的患者（关联appointment表，使用仓库getQuery()接口）
 void DoctorForm::loadPatients()
 {
-    QSqlQuery query(m_db->db); // 使用原库数据库连接
-    query.prepare("SELECT id, full_name, gender, date_of_birth, phone "
-                  "FROM patients ORDER BY created_at DESC");
+    // 使用Database的公共方法getQuery()获取查询对象（不直接访问db）
+    QSqlQuery query = m_db->getQuery();
+    // 仓库中预约表名为appointment（单数），修正表名
+    query.prepare(R"(
+        SELECT DISTINCT p.id, p.full_name, p.gender, p.date_of_birth, p.phone 
+        FROM patients p
+        JOIN appointment a ON p.id = a.patient_id
+        WHERE a.doctor_id = :doctorId
+        ORDER BY a.scheduled_at DESC
+    )");
+    query.bindValue(":doctorId", m_doctorId);
     if (!query.exec()) {
         m_statusBar->showMessage("患者列表加载失败: " + query.lastError().text());
         return;
@@ -134,13 +142,16 @@ void DoctorForm::loadPatients()
     m_patientModel->setHeaderData(4, Qt::Horizontal, "电话");
 }
 
-// 加载预约列表（从appointments表查询当前医生的预约）
+// 加载医生的预约（使用仓库getQuery()接口）
 void DoctorForm::loadAppointments()
 {
-    QSqlQuery query(m_db->db);
-    query.prepare("SELECT id, patient_id, scheduled_at, status, reason "
-                  "FROM appointments WHERE doctor_id = :doctorId "
-                  "ORDER BY scheduled_at DESC");
+    QSqlQuery query = m_db->getQuery();
+    query.prepare(R"(
+        SELECT id, patient_id, scheduled_at, status, reason 
+        FROM appointment 
+        WHERE doctor_id = :doctorId 
+        ORDER BY scheduled_at DESC
+    )");
     query.bindValue(":doctorId", m_doctorId);
     if (!query.exec()) {
         m_statusBar->showMessage("预约列表加载失败: " + query.lastError().text());
@@ -167,14 +178,14 @@ void DoctorForm::onPatientTableClicked(const QModelIndex &index)
     m_statusBar->showMessage(QString("已选中患者: %1 (ID: %2)").arg(patientName).arg(m_selectedPatientId));
 }
 
-// 打开医患聊天窗口（对接现有聊天系统）
+// 打开医患聊天窗口（对接仓库聊天系统）
 void DoctorForm::onChatBtnClicked()
 {
     if (m_selectedPatientId == 0) {
         QMessageBox::warning(this, "提示", "请先在患者列表中选择患者");
         return;
     }
-    // 调用原库ChatManager创建医生聊天窗口
+    // 调用仓库ChatManager创建医生聊天窗口
     ChatDialog *chatDlg = m_chatManager->createDoctorChatWindow(
         m_doctorUsername, m_selectedPatientId, this
     );
@@ -185,16 +196,15 @@ void DoctorForm::onChatBtnClicked()
     }
 }
 
-// 查看病历（实际项目中需对接病历表）
+// 查看病历（使用仓库getQuery()接口）
 void DoctorForm::onMedicalRecordBtnClicked()
 {
     if (m_selectedPatientId == 0) {
         QMessageBox::warning(this, "提示", "请先选择患者");
         return;
     }
-    // 从medical_cases表查询病历（示例逻辑）
-    QSqlQuery query(m_db->db);
-    query.prepare("SELECT id, content, created_at FROM medical_cases WHERE patient_id = :pid");
+    QSqlQuery query = m_db->getQuery();
+    query.prepare("SELECT id, content, created_at FROM medical_case WHERE patient_id = :pid");
     query.bindValue(":pid", m_selectedPatientId);
     if (query.exec() && query.next()) {
         QMessageBox::information(this, "患者病历", 
@@ -207,7 +217,7 @@ void DoctorForm::onMedicalRecordBtnClicked()
     }
 }
 
-// 处理预约（实际项目中需更新预约状态）
+// 处理预约（使用仓库getQuery()接口更新状态）
 void DoctorForm::onAppointmentBtnClicked()
 {
     QModelIndex index = m_appointmentTable->currentIndex();
@@ -218,9 +228,8 @@ void DoctorForm::onAppointmentBtnClicked()
     int appointmentId = m_appointmentModel->data(
         m_appointmentModel->index(index.row(), 0)
     ).toInt();
-    // 更新预约状态为"已处理"（示例逻辑）
-    QSqlQuery query(m_db->db);
-    query.prepare("UPDATE appointments SET status = '已处理' WHERE id = :aid");
+    QSqlQuery query = m_db->getQuery();
+    query.prepare("UPDATE appointment SET status = '已处理' WHERE id = :aid");
     query.bindValue(":aid", appointmentId);
     if (query.exec()) {
         m_statusBar->showMessage("预约处理成功");
