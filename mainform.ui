@@ -23,11 +23,19 @@
    <widget class="QPushButton" name="exit">
     <property name="geometry">
      <rect>
-      <x>340</x>
-      <y>270</y>
-      <width>81</width>
-      <height>21</height>
+      <x>330</x>
+      <y>260</y>
+      <width>91</width>
+      <height>51</height>
      </rect>
+    </property>
+    <property name="font">
+     <font>
+      <pointsize>12</pointsize>
+     </font>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">font-size: 1.2em;</string>
     </property>
     <property name="text">
      <string>退出</string>
@@ -52,33 +60,20 @@
      <string>请选择用户类型：</string>
     </property>
    </widget>
-   <widget class="QLabel" name="label_4">
-    <property name="geometry">
-     <rect>
-      <x>140</x>
-      <y>10</y>
-      <width>401</width>
-      <height>21</height>
-     </rect>
-    </property>
-    <property name="font">
-     <font>
-      <family>ADMUI3Lg</family>
-      <pointsize>30</pointsize>
-     </font>
-    </property>
-    <property name="text">
-     <string>新乡市TTS医院登陆平台欢迎您</string>
-    </property>
-   </widget>
    <widget class="QComboBox" name="comboBox_role">
     <property name="geometry">
      <rect>
-      <x>331</x>
-      <y>210</y>
+      <x>330</x>
+      <y>200</y>
       <width>81</width>
-      <height>31</height>
+      <height>50</height>
      </rect>
+    </property>
+    <property name="minimumSize">
+     <size>
+      <width>0</width>
+      <height>50</height>
+     </size>
     </property>
     <property name="font">
      <font>
@@ -102,38 +97,70 @@
      <rect>
       <x>30</x>
       <y>60</y>
-      <width>251</width>
-      <height>211</height>
+      <width>261</width>
+      <height>201</height>
      </rect>
     </property>
-    <layout class="QVBoxLayout" name="verticalLayout_2">
+    <layout class="QVBoxLayout" name="verticalLayout_2" stretch="0,0">
      <item>
       <layout class="QGridLayout" name="gridLayout">
-       <item row="1" column="0">
-        <widget class="QLabel" name="password">
+       <item row="1" column="1">
+        <widget class="QLineEdit" name="lineEdit_pwd">
+         <property name="font">
+          <font>
+           <pointsize>12</pointsize>
+          </font>
+         </property>
+         <property name="styleSheet">
+          <string notr="true">font-size: 1.2em;</string>
+         </property>
          <property name="text">
-          <string>密码：</string>
+          <string/>
          </property>
         </widget>
        </item>
        <item row="0" column="0">
         <widget class="QLabel" name="name">
+         <property name="font">
+          <font>
+           <pointsize>12</pointsize>
+          </font>
+         </property>
+         <property name="styleSheet">
+          <string notr="true">font-size: 1.2em;</string>
+         </property>
          <property name="text">
           <string>用户名：</string>
          </property>
         </widget>
        </item>
-       <item row="1" column="1">
-        <widget class="QLineEdit" name="lineEdit_pwd">
+       <item row="0" column="1">
+        <widget class="QLineEdit" name="lineEdit_user">
+         <property name="font">
+          <font>
+           <pointsize>12</pointsize>
+          </font>
+         </property>
+         <property name="styleSheet">
+          <string notr="true">font-size: 1.2em;</string>
+         </property>
          <property name="text">
           <string/>
          </property>
         </widget>
        </item>
-       <item row="0" column="1">
-        <widget class="QLineEdit" name="lineEdit_user">
+       <item row="1" column="0">
+        <widget class="QLabel" name="password">
+         <property name="font">
+          <font>
+           <pointsize>12</pointsize>
+          </font>
+         </property>
+         <property name="styleSheet">
+          <string notr="true">font-size: 1.2em;</string>
+         </property>
          <property name="text">
-          <string/>
+          <string>密码：</string>
          </property>
         </widget>
        </item>
@@ -143,6 +170,14 @@
       <layout class="QVBoxLayout" name="verticalLayout">
        <item>
         <widget class="QPushButton" name="pushButton_login">
+         <property name="font">
+          <font>
+           <pointsize>12</pointsize>
+          </font>
+         </property>
+         <property name="styleSheet">
+          <string notr="true">font-size: 1.2em;</string>
+         </property>
          <property name="text">
           <string>登录</string>
          </property>
@@ -150,6 +185,14 @@
        </item>
        <item>
         <widget class="QPushButton" name="pushButton_reg">
+         <property name="font">
+          <font>
+           <pointsize>12</pointsize>
+          </font>
+         </property>
+         <property name="styleSheet">
+          <string notr="true">font-size: 1.2em;</string>
+         </property>
          <property name="text">
           <string>注册</string>
          </property>
@@ -158,6 +201,28 @@
       </layout>
      </item>
     </layout>
+   </widget>
+   <widget class="QLabel" name="label">
+    <property name="geometry">
+     <rect>
+      <x>40</x>
+      <y>20</y>
+      <width>61</width>
+      <height>30</height>
+     </rect>
+    </property>
+    <property name="font">
+     <font>
+      <family>ADMUI3Lg</family>
+      <pointsize>30</pointsize>
+     </font>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">font-size: 1.2em;</string>
+    </property>
+    <property name="text">
+     <string>登陆界面</string>
+    </property>
    </widget>
   </widget>
   <widget class="QMenuBar" name="menuBar">
