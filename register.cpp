@@ -56,8 +56,8 @@ void Register::onRegOKClicked()
 
     // ④ 根据角色插入 patients 或 doctors 表
     if (role == "患者") {
-        QString fullName = user;        // 先用用户名顶替姓名
-        QString birth    = age;         // 先用年龄顶替出生日期
+        QString fullName = ui->lineEdit_regUse->text().trimmed();      // 先用用户名顶替姓名
+        QString birth    = "";         //没生日先空着
         QString gender   = ui->comboBox_gender->currentText();       // 你没性别输入，先空着
 
         if (!db.insertPatient(fullName, birth, idNumber, phone, address, gender)) {
@@ -65,10 +65,10 @@ void Register::onRegOKClicked()
             return;
         }
     } else if (role == "医生") {
-        QString fullName      = user;   // 先用用户名顶替姓名
-        QString specialty     = "";     // 你没科室输入，先空着
-        QString licenseNumber = "";     // 你没执业证号输入，先空着
-        QString clinicAddress = address;// 你用输入的地址
+        QString fullName = ui->lineEdit_regUse->text().trimmed();     // 先用用户名顶替姓名
+        QString specialty     = "";     // 没科室输入，先空着
+        QString licenseNumber = "";     // 没执业证号输入，先空着
+        QString clinicAddress = address;// 用输入的地址
         QString gender   = ui->comboBox_gender->currentText();
 
         if (!db.insertDoctor(userId, fullName, phone, specialty, licenseNumber, clinicAddress)) {
