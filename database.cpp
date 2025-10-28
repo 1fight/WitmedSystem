@@ -22,7 +22,6 @@ Database::Database()
         QSqlQuery pragma(db);
         pragma.exec("PRAGMA foreign_keys = ON;");
     }
-
     // 创建表（如果需要）
     if (!createTablesIfNeeded()) {
         qWarning() << "Failed to create tables";
@@ -293,28 +292,135 @@ bool Database::insertPatient(const QString& fullName, const QString& dateOfBirth
 }
 
 // 插入医生（与表列保持一致：当前 doctors 表没有 gender 列）
-bool Database::insertDoctor(int userId, const QString &fullName, const QString &phone, const QString &specialty, const QString &licenseNumber, const QString &clinicAddress)
-{
-    if (!db.isOpen()) return false;
-    QSqlQuery q(db);
-    q.prepare(R"(
-        INSERT INTO doctors (id, full_name, phone, specialty, license_number, clinic_address)
-        VALUES (:id, :full_name, :phone, :specialty, :license_number, :clinic_address)
-    )");
-    q.bindValue(":id", userId);
-    q.bindValue(":full_name", fullName);
-    q.bindValue(":phone", phone);
-    q.bindValue(":specialty", specialty);
-    q.bindValue(":license_number", licenseNumber);
-    q.bindValue(":clinic_address", clinicAddress);
+// Database.cpp
+// Replace or add this function in your Database implementation.
 
-    if (!q.exec()) {
-        qWarning() << "insertDoctor error:" << q.lastError().text();
+bool Database::insertDoctor(int userId,
+                            const QString &fullName,
+                            const QString &phone,
+                            const QString &specialty,
+                            const QString &licenseNumber,
+                            const QString &clinicAddress)
+{
+    if (!db.isOpen()) {
+        qWarning() << "insertDoctor: db not open";
         return false;
     }
-    return true;
-}
 
+    // 确保外键工作（SQLite 每连接需要打开）
+    QSqlQuery fk(db);
+    fk.exec("PRAGMA foreign_keys = ON;");
+
+    // 1) 验证 users 表存在该 userId
+    {
+        QSqlQuery chk(db);
+        chk.prepare("SELECT 1 FROM users WHERE id = :uid LIMIT 1");
+        chk.bindValue(":uid", userId);
+        if (!chk.exec()) {
+            qWarning() << "insertDoctor: check user exec failed:" << chk.lastError().text();
+            return false;
+        }
+        if (!chk.next()) {
+            qWarning() << "insertDoctor: userId does not exist in users:" << userId;
+            return false;
+        }
+    }
+
+    // 处理 licenseNumber：把空字符串当作 SQL NULL
+    QVariant licenseValue;
+    QString licenseTrim = licenseNumber.trimmed();
+    if (licenseTrim.isEmpty()) {
+        licenseValue = QVariant(); // NULL
+    } else {
+        licenseValue = licenseTrim;
+        // 如果是非空执业证号，先检查是否被其他 doctor 使用（避免 UNIQUE 失败）
+        QSqlQuery checkLicense(db);
+        checkLicense.prepare("SELECT id FROM doctors WHERE license_number = :lic LIMIT 1");
+        checkLicense.bindValue(":lic", licenseTrim);
+        if (!checkLicense.exec()) {
+            qWarning() << "insertDoctor: check license exec failed:" << checkLicense.lastError().text();
+            return false;
+        }
+        if (checkLicense.next()) {
+            int existingId = checkLicense.value(0).toInt();
+            if (existingId != userId) {
+                qWarning() << "insertDoctor: license number already used by doctor id=" << existingId;
+                // 这里可以根据业务决定：返回 false 并让调用者告知用户，或将冲突处理为 update 等
+                return false;
+            }
+            // 如果 existingId == userId，则允许继续（是更新或重复提交）
+        }
+    }
+
+    // 2) 检查 doctors 中是否已有该 id（你的表结构以 id==userId）
+    QSqlQuery exist(db);
+    exist.prepare("SELECT 1 FROM doctors WHERE id = :id LIMIT 1");
+    exist.bindValue(":id", userId);
+    if (!exist.exec()) {
+        qWarning() << "insertDoctor: check doctor exist failed:" << exist.lastError().text();
+        return false;
+    }
+
+    bool useTx = db.driver()->hasFeature(QSqlDriver::Transactions);
+    if (useTx) db.transaction();
+
+    if (exist.next()) {
+        // UPDATE existing row（注意绑定 licenseValue 可能为 NULL）
+        QSqlQuery q(db);
+        const QString sql = QStringLiteral(
+            "UPDATE doctors SET full_name = ?, phone = ?, specialty = ?, license_number = ?, clinic_address = ? WHERE id = ?"
+        );
+        if (!q.prepare(sql)) {
+            qWarning() << "insertDoctor: prepare UPDATE failed:" << q.lastError().text();
+            if (useTx) db.rollback();
+            return false;
+        }
+        q.addBindValue(fullName);
+        q.addBindValue(phone);
+        q.addBindValue(specialty);
+        q.addBindValue(licenseValue); // NULL 或 实际字符串
+        q.addBindValue(clinicAddress);
+        q.addBindValue(userId);
+        if (!q.exec()) {
+            qWarning() << "insertDoctor: UPDATE exec failed:" << q.lastError().text();
+            if (useTx) db.rollback();
+            return false;
+        }
+        if (useTx) db.commit();
+        qDebug() << "insertDoctor: updated existing doctor id=" << userId;
+        return true;
+    } else {
+        // INSERT 新行（id 存 userId）
+        QSqlQuery q(db);
+        const QString sql = QStringLiteral(
+            "INSERT INTO doctors (id, full_name, phone, specialty, license_number, clinic_address) VALUES (?, ?, ?, ?, ?, ?)"
+        );
+        if (!q.prepare(sql)) {
+            qWarning() << "insertDoctor: prepare INSERT failed:" << q.lastError().text();
+            if (useTx) db.rollback();
+            return false;
+        }
+        q.addBindValue(userId);
+        q.addBindValue(fullName);
+        q.addBindValue(phone);
+        q.addBindValue(specialty);
+        q.addBindValue(licenseValue); // NULL 或 实际字符串
+        q.addBindValue(clinicAddress);
+
+        if (!q.exec()) {
+            qWarning() << "insertDoctor: INSERT exec failed:" << q.lastError().text();
+            // 如果是 UNIQUE constraint failed: doctors.license_number，可以在这里给出更友好的信息
+            if (q.lastError().text().contains("UNIQUE") && !licenseTrim.isEmpty()) {
+                qWarning() << "insertDoctor: license number conflict for value =" << licenseTrim;
+            }
+            if (useTx) db.rollback();
+            return false;
+        }
+        if (useTx) db.commit();
+        qDebug() << "insertDoctor: inserted new doctor id=" << userId;
+        return true;
+    }
+}
 // 其余插入方法保持不变（你之前实现的逻辑是可以的）
 // 例如 insertMedicalCase, insertAppointment, insertDiagnosis, insertMedicalOrder, insertPrescription
 // 请确保函数签名与 header 文件一致（如果 header 签名不同，请同步）
