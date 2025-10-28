@@ -3,6 +3,8 @@
 #include "register.h"
 #include <QMessageBox>
 #include "database.h"
+#include <QPixmap>
+#include <QPainter>
 
 MainForm::MainForm(QWidget *parent)
     : QMainWindow(parent), ui(new Ui::MainForm), regWindow(new Register)
@@ -10,14 +12,13 @@ MainForm::MainForm(QWidget *parent)
     ui->setupUi(this);
     connect(ui->pushButton_login, &QPushButton::clicked, this, &MainForm::onLoginClicked);
     connect(ui->pushButton_reg, &QPushButton::clicked, this, &MainForm::onRegClicked);
+    p=new patient();
 }
 
 MainForm::~MainForm()
 {
     delete ui;
 }
-
-
 
 void MainForm::onLoginClicked()
 {
@@ -39,16 +40,22 @@ void MainForm::onLoginClicked()
         QMessageBox::warning(this, "登录失败", "密码错误！");
         return;
     }
+    // 密码已验证通过
+    QString realRole = u["role"].toString();
+    if (realRole != ui->comboBox_role->currentText()) {
+        QMessageBox::warning(this, "登录失败", "身份选择错误！");
+        return;
+    }
 
     QString role = u["role"].toString();
-    QMessageBox::information(this, "登录成功",QString("欢迎 %1（%2）").arg(user, role));
-
+    QMessageBox::information(this, "登录成功",
+                             QString("欢迎 %1（%2）").arg(user, role));
 
 
 
     //触发信号   在需要使用目前登录id的界面的构造函数中connect链接 并写槽函数就行
-    int id=ui->lineEdit_user->text().toInt();
-    emit sendCurrentLoginID(id);
+       int id=ui->lineEdit_user->text().toInt();
+       emit sendCurrentLoginID(id);
 
 }
 void MainForm::onRegClicked()
